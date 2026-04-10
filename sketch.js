@@ -9,7 +9,7 @@
 let faceMesh;
 let video;
 let faces = [];
-let options = { maxFaces: 1, refineLandmarks: false, flipHorizontal: false };
+let options = { maxFaces: 3, refineLandmarks: false, flipHorizontal: false };
 
 function preload() {
   // Load the faceMesh model
