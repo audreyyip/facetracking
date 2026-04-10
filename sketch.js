@@ -19,6 +19,7 @@ function setup() {
     video = createCapture(VIDEO, { flipped: true });
     video.hide();
     faceMesh.detectStart(video, gotFaces);
+    console.log("setup complete");
 }
 
 function draw() {
@@ -30,7 +31,9 @@ function draw() {
                 fill(255,255,0);
                 noStroke();
                 circle(keypoint.x,keypoint.y,5);
+                console.log("dot complete");
             }
         }
     }
+    console.log("draw complete");
 }
