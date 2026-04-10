@@ -1,54 +1,49 @@
-console.log("sketch.js loaded");
+/*
+ * 👋 Hello! This is an ml5.js example made and shared with ❤️.
+ * Learn more about the ml5.js project: https://ml5js.org/
+ * ml5.js license and Code of Conduct: https://github.com/ml5js/ml5-next-gen/blob/main/LICENSE.md
+ *
+ * This example demonstrates face tracking on live video through ml5.faceMesh.
+ */
 
-let video;
 let faceMesh;
+let video;
 let faces = [];
+let options = { maxFaces: 1, refineLandmarks: false, flipHorizontal: false };
 
 function preload() {
-  faceMesh = ml5.faceMesh({ flipped: true });
-}
-
-function gotFaces(results) {
-  faces = results;
+  // Load the faceMesh model
+  faceMesh = ml5.faceMesh(options);
 }
 
 function setup() {
   createCanvas(640, 480);
-  background(100);
-
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then((stream) => {
-      console.log("✅ getUserMedia works! Stream:", stream);
-
-      video = createCapture(VIDEO, { flipped: true }, () => {
-        console.log("✅ p5 camera ready, size:", video.width, video.height);
-        faceMesh.detectStart(video, gotFaces);
-      });
-      video.hide();
-
-    })
-    .catch((err) => {
-      console.error("❌ Camera error:", err.name, err.message);
-    });
+  // Create the webcam video and hide it
+  video = createCapture(VIDEO);
+  video.size(640, 480);
+  video.hide();
+  // Start detecting faces from the webcam video
+  faceMesh.detectStart(video, gotFaces);
 }
 
 function draw() {
-  if (!video || video.width === 0) {
-    fill(255);
-    textAlign(CENTER, CENTER);
-    textSize(16);
-    text("Waiting for camera...", width / 2, height / 2);
-    return;
-  }
-
+  // Draw the webcam video
   image(video, 0, 0, width, height);
 
-  for (let face of faces) {
-    for (let i = 0; i < face.keypoints.length; i++) {
-      let keypoint = face.keypoints[i];
-      fill(255, 255, 0);
+  // Draw all the tracked face points
+  for (let i = 0; i < faces.length; i++) {
+    let face = faces[i];
+    for (let j = 0; j < face.keypoints.length; j++) {
+      let keypoint = face.keypoints[j];
+      fill(0, 255, 0);
       noStroke();
       circle(keypoint.x, keypoint.y, 5);
     }
   }
+}
+
+// Callback function for when faceMesh outputs data
+function gotFaces(results) {
+  // Save the output to the faces variable
+  faces = results;
 }
