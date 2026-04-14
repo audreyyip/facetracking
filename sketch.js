@@ -1,49 +1,95 @@
-/*
- * 👋 Hello! This is an ml5.js example made and shared with ❤️.
- * Learn more about the ml5.js project: https://ml5js.org/
- * ml5.js license and Code of Conduct: https://github.com/ml5js/ml5-next-gen/blob/main/LICENSE.md
- *
- * This example demonstrates face tracking on live video through ml5.faceMesh.
- */
+let capture;
+let capturewidth = 1920;    
+let captureheight = 1080;
 
-let faceMesh;
-let video;
-let faces = [];
-let options = { maxFaces: 3, refineLandmarks: false, flipHorizontal: false };
+let emotions = ["neutral", "happy", "sad", "angry", "fearful", "disgusted", "surprised"];
 
-function preload() {
-  // Load the faceMesh model
-  faceMesh = ml5.faceMesh(options);
-}
+// Emotion visuals: each entry has a label color and a draw function
+let emotionVisuals = {
+  happy:     () => { fill('#FFD700'); noStroke(); star(width/2, height/2, 40, 80, 5); },
+  sad:       () => { fill('#6495ED'); noStroke(); ellipse(width/2, height/2, 80, 40); },
+  angry:     () => { fill('#FF4500'); noStroke(); triangle(width/2, height/2 - 60, width/2 - 50, height/2 + 40, width/2 + 50, height/2 + 40); },
+  fearful:   () => { fill(255, 255, 100, 180); noStroke(); for(let i=0;i<5;i++) ellipse(width/2 + random(-100,100), height/2 + random(-100,100), 20, 20); },
+  disgusted: () => { fill('#32CD32'); noStroke(); rect(width/2 - 40, height/2 - 40, 80, 80, 10); },
+  surprised: () => { fill('#FF69B4'); noStroke(); ellipse(width/2, height/2, 100, 100); },
+  neutral:   () => { fill('#AAAAAA'); noStroke(); rect(width/2 - 60, height/2 - 10, 120, 20, 5); }
+};
+
+let faceapi;
+let detections = [];
 
 function setup() {
-  createCanvas(640, 480);
-  // Create the webcam video and hide it
-  video = createCapture(VIDEO);
-  video.size(640, 480);
-  video.hide();
-  // Start detecting faces from the webcam video
-  faceMesh.detectStart(video, gotFaces);
+  createCanvas(capturewidth, captureheight);
+  
+  // Constrain video to match canvas resolution
+  capture = createCapture({ video: { width: capturewidth, height: captureheight } });
+  capture.position(0, 0);
+  capture.hide();
+  
+  const faceOptions = { withLandmarks: true, withExpressions: true, withDescriptors: false };
+  faceapi = ml5.faceApi(capture, faceOptions, faceReady);
+}
+
+function faceReady() {
+  faceapi.detect(gotFaces);
+}
+
+function gotFaces(error, result) {
+  if (error) { console.log(error); return; }
+  detections = result;
+  faceapi.detect(gotFaces);
+}
+
+// Helper: draw a 5-point star
+function star(x, y, r1, r2, npoints) {
+  let angle = TWO_PI / npoints;
+  let half = angle / 2;
+  beginShape();
+  for (let a = -HALF_PI; a < TWO_PI - HALF_PI; a += angle) {
+    vertex(x + cos(a) * r2, y + sin(a) * r2);
+    vertex(x + cos(a + half) * r1, y + sin(a + half) * r1);
+  }
+  endShape(CLOSE);
 }
 
 function draw() {
-  // Draw the webcam video
-  image(video, 0, 0, width, height);
+  background(0);
+  capture.loadPixels();
 
-  // Draw all the tracked face points
-  for (let i = 0; i < faces.length; i++) {
-    let face = faces[i];
-    for (let j = 0; j < face.keypoints.length; j++) {
-      let keypoint = face.keypoints[j];
-      fill(0, 255, 0);
-      noStroke();
-      circle(keypoint.x, keypoint.y, 5);
+  push();
+  fill('green');
+  
+  if (detections.length > 0) {
+    for (let i = 0; i < detections.length; i++) {
+      
+      // Draw landmarks
+      let points = detections[i].landmarks.positions;
+      for (let j = 0; j < points.length; j++) {
+        circle(points[j]._x, points[j]._y, 5);
+      }
+
+      // Draw emotion bars + percentages
+      push();
+      textSize(20);
+      for (let k = 0; k < emotions.length; k++) {
+        let thisemotion = emotions[k];
+        let thisemotionlevel = detections[i].expressions[thisemotion];
+        let pct = (thisemotionlevel * 100).toFixed(1) + "%";  // ← decimal → percentage
+
+        fill('green');
+        text(thisemotion + ": " + pct, 40, 50 + 50 * k);
+        rect(40, 60 + 50 * k, thisemotionlevel * 200, 20);
+
+        // ← Conditional visual: show themed element if emotion ≥ 60%
+        if (thisemotionlevel >= 0.6 && emotionVisuals[thisemotion]) {
+          push();
+          emotionVisuals[thisemotion]();
+          pop();
+        }
+      }
+      pop();
     }
   }
-}
-
-// Callback function for when faceMesh outputs data
-function gotFaces(results) {
-  // Save the output to the faces variable
-  faces = results;
+  
+  pop();
 }
