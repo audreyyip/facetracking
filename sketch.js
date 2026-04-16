@@ -3,6 +3,8 @@ let faceapi;
 let detections = [];
 let canvas;
 let isModelReady = false;
+let startTime;
+let minimumLoadingTime = 5000;
 
 let capturewidth, captureheight;
 let scalar = 1; 
@@ -36,6 +38,7 @@ function setup() {
       facingMode: 'user'
     }
   };
+  
 
   capture = createCapture(constraints);
   capture.parent(container); // Moves video into the 0px box
@@ -45,6 +48,8 @@ function setup() {
   // 3. START FACE API
   const faceOptions = { withLandmarks: true, withExpressions: true, flipHorizontal: false };
   faceapi = ml5.faceApi(capture, faceOptions, faceReady);
+
+  startTime = millis();
 }
 
 function faceReady() {
@@ -64,20 +69,29 @@ function gotFaces(error, result) {
 function draw() {
   background(0);
 
-  if (!isModelReady) {
+  // Calculate how much time has passed
+  let timePassed = millis() - startTime;
+
+  // Only proceed if the model is ready AND we have waited long enough
+  if (!isModelReady || timePassed < minimumLoadingTime) {
     drawLoadingScreen();
+    
+    // Optional: Add a "Progress Bar" at the bottom
+    let progress = map(timePassed, 0, minimumLoadingTime, 0, width);
+    fill(0, 255, 0);
+    rect(0, height - 5, progress, 5); 
+
   } else {
-    // MAIN APP
+    // --- MAIN APP ---
     push();
     translate(width, 0);
     scale(-1, 1);
     if (capture.loadedmetadata) {
       image(capture, 0, 0, width, height);
     }
-
+    
     if (detections.length > 0) {
       fill(0, 255, 0);
-      noStroke();
       for (let i = 0; i < detections.length; i++) {
         let points = detections[i].landmarks.positions;
         for (let j = 0; j < points.length; j++) {
@@ -86,7 +100,7 @@ function draw() {
       }
     }
     pop();
-
+    
     if (detections.length > 0) {
       drawUI();
     }
@@ -99,7 +113,7 @@ function drawLoadingScreen() {
   
   // Title
   textSize(32 * scalar);
-  text("SETTING UP...", width / 2, height / 2 - 100 * scalar);
+  text("LOADING...", width / 2, height / 2 - 100 * scalar);
   
   // Instructions
   textSize(18 * scalar);
