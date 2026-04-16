@@ -125,4 +125,26 @@ function drawUI() {
   }
 }
 
-// Ensure the sketch reloads if the user
+function windowResized() {
+  // 1. Recalculate the responsive dimensions
+  if (windowWidth < windowHeight) {
+    // Portrait Mode
+    capturewidth = windowWidth;
+    captureheight = windowWidth * (4 / 3);
+  } else {
+    // Landscape Mode (max out at 960)
+    capturewidth = Math.min(960, windowWidth);
+    captureheight = capturewidth * (3 / 4);
+  }
+
+  // 2. Resize the canvas to the new dimensions
+  resizeCanvas(capturewidth, captureheight);
+  
+  // 3. Update the scalar so text and dots scale with the new size
+  scalar = capturewidth / 960;
+
+  // 4. Update the position to keep it centered
+  let x = (windowWidth - width) / 2;
+  let y = (windowHeight - height) / 2;
+  canvas.position(x, y);
+}
