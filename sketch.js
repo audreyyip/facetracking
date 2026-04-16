@@ -3,49 +3,58 @@ let faceapi;
 let detections = [];
 
 let capturewidth, captureheight;
-let scalar = 1; // Used to scale UI elements based on screen size
+let scalar = 1;
+let canvas; // moved to global so windowResized can access it
 
 let emotions = ["neutral", "happy", "sad", "angry", "fearful", "disgusted", "surprised"];
 
-function setup() {
-  // 1. RESPONSIVE DIMENSIONS
-  // If the screen is taller than it is wide (Portrait), use windowWidth
+function getResponsiveDimensions() {
   if (windowWidth < windowHeight) {
-    capturewidth = windowWidth;
-    captureheight = windowWidth * (4 / 3); // Maintain 4:3 camera aspect ratio
+    // Portrait: fit within the viewport height too, not just width
+    let w = windowWidth;
+    let h = Math.min(w * (4 / 3), windowHeight); // <-- KEY FIX: cap to screen height
+    w = h * (3 / 4); // re-derive width in case height was the constraint
+    return { w, h };
   } else {
-    // Landscape / Desktop
-    capturewidth = 960;
-    captureheight = 720;
+    let w = Math.min(960, windowWidth);
+    let h = w * (3 / 4);
+    return { w, h };
   }
+}
 
-  // Calculate scalar based on a base width of 960
+function setup() {
+  let dims = getResponsiveDimensions();
+  capturewidth = dims.w;
+  captureheight = dims.h;
   scalar = capturewidth / 960;
 
-  // Create and center the canvas
-  let cnv = createCanvas(capturewidth, captureheight);
-  cnv.position((windowWidth - width) / 2, (windowHeight - height) / 2);
+  canvas = createCanvas(capturewidth, captureheight);
+  canvas.position((windowWidth - width) / 2, (windowHeight - height) / 2);
 
-  // 2. MOBILE-FRIENDLY CAPTURE
+  // Prevent the page body from scrolling/overflowing
+  canvas.style('display', 'block');
+  document.body.style.margin = '0';
+  document.body.style.overflow = 'hidden';
+  document.body.style.background = '#000';
+
   const constraints = {
     video: {
       width: { ideal: capturewidth },
       height: { ideal: captureheight },
-      facingMode: 'user' // Uses front camera on mobile
+      facingMode: 'user'
     },
     audio: false
   };
 
   capture = createCapture(constraints);
-  capture.elt.setAttribute('playsinline', ''); // Essential for iOS
-  capture.hide(); // Hides the extra video element below the canvas
+  capture.elt.setAttribute('playsinline', '');
+  capture.hide();
 
-  // 3. INITIALIZE FACE API
   const faceOptions = {
     withLandmarks: true,
     withExpressions: true,
     withDescriptors: false,
-    flipHorizontal: false // We handle mirroring manually in draw()
+    flipHorizontal: false
   };
 
   faceapi = ml5.faceApi(capture, faceOptions, faceReady);
@@ -57,10 +66,7 @@ function faceReady() {
 }
 
 function gotFaces(error, result) {
-  if (error) {
-    console.log(error);
-    return;
-  }
+  if (error) { console.log(error); return; }
   detections = result;
   faceapi.detect(gotFaces);
 }
@@ -68,83 +74,75 @@ function gotFaces(error, result) {
 function draw() {
   background(0);
 
-  // --- MIRRORING SECTION ---
   push();
-  // Flip the canvas horizontally
   translate(width, 0);
   scale(-1, 1);
 
-  // Only draw video if it's ready
   if (capture.loadedmetadata) {
     image(capture, 0, 0, width, height);
   }
 
-  // Draw landmarks
   if (detections.length > 0) {
+    // Scale landmarks from capture resolution to canvas resolution
+    let xScale = width / capture.width;
+    let yScale = height / capture.height;
+
     fill(0, 255, 0);
     noStroke();
     for (let i = 0; i < detections.length; i++) {
       let points = detections[i].landmarks.positions;
       for (let j = 0; j < points.length; j++) {
-        // Dot size scales with screen size
-        circle(points[j]._x, points[j]._y, 5 * scalar);
+        circle(points[j]._x * xScale, points[j]._y * yScale, 8 * scalar);
       }
     }
   }
-  pop(); // End of mirrored section
+  pop();
 
-  // --- NON-MIRRORING UI SECTION ---
-  // Text needs to be drawn outside the mirrored push/pop so it's readable
   if (detections.length > 0) {
     drawUI();
   }
 }
 
 function drawUI() {
-  // Dynamic font sizing based on scalar
-  let baseTextSize = 20 * scalar;
-  let margin = 30 * scalar;
-  
+  let baseTextSize = max(14, 20 * scalar); // minimum 14px so it's never too tiny
+  let margin = max(24, 30 * scalar);
+  let barMaxWidth = width * 0.35; // bar spans 35% of canvas width, scales naturally
+  let leftEdge = 12 * scalar;
+
   textSize(baseTextSize);
   textAlign(LEFT);
+  textFont('monospace');
 
   for (let i = 0; i < detections.length; i++) {
     for (let k = 0; k < emotions.length; k++) {
       let thisEmotion = emotions[k];
       let level = detections[i].expressions[thisEmotion];
-
       let yPos = margin + (margin * k);
-      
+
+      // Label
       fill(255);
-      text(thisEmotion.toUpperCase() + ": " + nf(level, 1, 2), 20 * scalar, yPos);
-      
-      // Emotion Bar
+      noStroke();
+      text(thisEmotion.toUpperCase() + ": " + nf(level, 1, 2), leftEdge, yPos);
+
+      // Bar background (dark green)
+      fill(0, 80, 0);
+      rect(leftEdge, yPos + (5 * scalar), barMaxWidth, 8 * scalar);
+
+      // Bar fill
       fill(0, 255, 0);
-      rect(20 * scalar, yPos + (5 * scalar), level * (150 * scalar), 8 * scalar);
+      rect(leftEdge, yPos + (5 * scalar), level * barMaxWidth, 8 * scalar);
     }
   }
 }
 
 function windowResized() {
-  // 1. Recalculate the responsive dimensions
-  if (windowWidth < windowHeight) {
-    // Portrait Mode
-    capturewidth = windowWidth;
-    captureheight = windowWidth * (4 / 3);
-  } else {
-    // Landscape Mode (max out at 960)
-    capturewidth = Math.min(960, windowWidth);
-    captureheight = capturewidth * (3 / 4);
-  }
+  let dims = getResponsiveDimensions();
+  capturewidth = dims.w;
+  captureheight = dims.h;
 
-  // 2. Resize the canvas to the new dimensions
   resizeCanvas(capturewidth, captureheight);
-  
-  // 3. Update the scalar so text and dots scale with the new size
   scalar = capturewidth / 960;
 
-  // 4. Update the position to keep it centered
-  let x = (windowWidth - width) / 2;
-  let y = (windowHeight - height) / 2;
-  canvas.position(x, y);
+  // FIX: was `canvas.position` (undefined) — must use `canvas`
+  canvas.position((windowWidth - width) / 2, (windowHeight - height) / 2);
 }
